@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>추리 퀴즈 — 놀이공원의 냉기</title>
+<style>
+  :root{
+    --bg:#0c0e13; --panel:#151823; --line:#2a3040; --ink:#e9ecf2; --muted:#8b93a6;
+    --mina:#5fb4ff; --yuki:#7fd6a0; --gold:#ffd54a; --x:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:radial-gradient(130% 100% at 50% 0%,#171b27 0%,var(--bg) 60%);
+    color:var(--ink);
+    font-family:"Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;
+    display:flex;flex-direction:column;align-items:center;height:100%;overflow:hidden;
+  }
+  #top{width:100%;max-width:760px;padding:12px 18px 8px;text-align:center}
+  #top h1{margin:0;font-size:16px;letter-spacing:2px;color:#dfe3ea;font-weight:700}
+
+  #stage{width:100%;max-width:760px;flex:1;display:flex;flex-direction:column;
+         min-height:0;padding:0 14px 10px;cursor:pointer}
+  #log{flex:1;overflow-y:auto;padding:10px 4px 6px;display:flex;flex-direction:column;gap:12px;
+       scroll-behavior:smooth}
+  .row{display:flex}
+  .row.L{justify-content:flex-start}
+  .row.R{justify-content:flex-end}
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  .bubble{position:relative;max-width:84%;background:var(--panel);border:1px solid var(--line);
+          border-left:4px solid var(--line);border-radius:12px;padding:10px 14px;animation:rise .22s ease}
+  .row.R .bubble{border-left:1px solid var(--line);border-right:4px solid var(--line)}
+  .bubble .name{font-size:12px;font-weight:800;margin-bottom:3px}
+  .bubble .txt{font-size:15px;line-height:1.65;color:#eef1f6;white-space:pre-wrap}
+
+  #quiz{display:none;flex-wrap:wrap;gap:8px;padding:8px 4px 4px}
+  #quiz .qbtn{flex:1 1 46%;min-width:160px;text-align:left;background:#1b2030;border:1px solid var(--line);
+       color:var(--ink);padding:12px 14px;border-radius:11px;cursor:pointer;font-size:14px;
+       font-family:inherit;line-height:1.45;transition:border-color .12s,transform .06s}
+  #quiz .qbtn:hover{border-color:var(--gold);color:#fff}
+  #quiz .qbtn::before{content:"";color:var(--gold);font-weight:800;margin-right:8px}
+  #quiz .qbtn.x{border-color:#5a2b2b;color:#7e6066;cursor:not-allowed;background:#19141a;
+       text-decoration:line-through;animation:shake .3s}
+  #quiz .qbtn.x::before{content:"✗ ";color:var(--x);text-decoration:none}
+  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+
+  #hint{height:22px;text-align:center;color:var(--muted);font-size:12px;
+        padding-top:2px;user-select:none;animation:pulse 1.4s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:.4}50%{opacity:.9}}
+  #done{display:none;flex-direction:column;align-items:center;gap:12px;
+        color:var(--gold);font-weight:800;font-size:15px;padding:14px 0 18px;letter-spacing:1px}
+  #done button{background:linear-gradient(180deg,#243047,#1a2235);border:1px solid var(--gold);
+        color:var(--gold);font-weight:800;font-size:14px;letter-spacing:1px;padding:11px 22px;
+        border-radius:11px;cursor:pointer;font-family:inherit;box-shadow:0 0 0 3px rgba(255,213,74,.12)}
+  #done button:hover{background:#2a3550;color:#fff}
+</style>
+</head>
+<body>
+  <div id="top"><h1>추리 퀴즈 &mdash; 놀이공원의 냉기</h1></div>
+  <div id="stage">
+    <div id="log"></div>
+    <div id="quiz"></div>
+    <div id="done">― 추리 종료 ―</div>
+    <div id="hint">▼ 클릭하여 계속</div>
+  </div>
+
+<script>
+/* ============================================================
+   대본 — 여기만 고치면 됩니다.
+   {s:"미나토", t:"..."}  = 대사
+   {q:[ {label, ok:true} ]} = 객관식 (ok 없는 건 오답=✗, ok:true는 정답)
+     · 옵션에 sub:[...] = 그걸 고르면 하위 선택지가 나옴 (Q1처럼)
+   ============================================================ */
+const STORY = [
+ {s:"유키미즈", t:`……처음에, 우리는 폭탄을 찾기로 했었지. 기억하고 있겠지?`},
+ {s:"미나토", t:`네, 이번 의뢰는 폭파 테러를 미연에 방지하는 거니까요. 폭발물이 설치되어 있을 가능성을 고려하는 건 당연한 일이죠.`},
+ {s:"유키미즈", t:`직원들에게 탐문해서, 수상한 장소를 찾았다. 유력한 정보는 얻지 못했지만, 그걸 바탕으로 경찰에 폭탄 조사를 의뢰했다.`},
+ {s:"미나토", t:`그 결과, 폭탄의 위치를 특정할 수 있었습니다. 장소는…….`},
+ {q:[
+   {label:`중앙 에리어`},
+   {label:`동부 에리어`},
+   {label:`서부 에리어`},
+   {label:`그 외`, sub:[
+     {label:`경찰이 가지고 있었다`},
+     {label:`미나토가 가지고 있었다`},
+     {label:`애초에 폭탄은 없었다`, ok:true},
+   ]},
+ ]},
+ {s:"유키미즈", t:`애초에 폭탄은 설치되어 있지 않았어. 폭파 테러라는 말에 현혹되어 있었어. 우리는 테러가 일어날 가능성을 생각했어야 한다.\n주어진 증거만으로는 '폭탄의 위치'에 도달하는 건 불가능에 가깝다. 유연하게 생각할 필요가 있었어.`},
+ {s:"미나토", t:`결론적으로, 폭파 테러 방법은 알 수 없었습니다. 하지만, 실마리를 풀기 위한 작은 힌트가 있었습니다. 그걸 알려준 건…….`},
+ {q:[
+   {label:`눈빛이 날카로운 손님`},
+   {label:`패딩 입은 손님`},
+   {label:`안경을 고쳐 쓰는 손님`},
+   {label:`탱크톱 손님`, ok:true},
+   {label:`두꺼운 코트를 입은 손님`},
+   {label:`털장갑과 털모자를 쓴 손님`},
+ ]},
+ {s:"미나토", t:`그걸 알려준 건 탱크톱을 입은 손님이었어요. 일기예보에서는 고기압의 영향으로 평소보다 따뜻할 거라고 했지만, 그것보다 훨씬 낮은 기온이에요. 저희가 순찰할 때만 해도 날씨가 좋았는데 이 놀이공원만 비정상적으로 추워요. 어때요, 토오루 씨?`},
+ {s:"유키미즈", t:`그렇군. 나는 수사에 몰두하느라 눈치채지 못했어. 역시, 미나토.`},
+ {s:"미나토", t:`그 정도까지는 아니에요~`},
+ {s:"유키미즈", t:`이 이상 현상을 설명하는 것, 그건 아마 이능일 거야. 다시 말해, 범인의 이능은…….`},
+ {q:[
+   {label:`특정 장소에 가두는 이능`},
+   {label:`공간을 이동하는 이능`},
+   {label:`온도를 낮추는 이능`, ok:true},
+   {label:`날씨를 조종하는 이능`},
+   {label:`추위를 누그러뜨리는 이능`},
+   {label:`마음을 읽는 이능`},
+ ]},
+ {s:"유키미즈", t:`범인의 이능은 온도를 낮추는 이능일 가능성이 높다. 물론 어느 정도 온도를 낮출지, 범위, 강도, 시간, 그것들 전부를 알 수 있는 건 아니지만……\n하지만 지금 상황은 범인이 의도치 않은 곳에서 증거를 남겨버린 것처럼 느껴져. 내 [감정동조] 발동이 제어할 수 있는 것이 아니듯이, 주변 온도가 저절로 내려가 버리는 부작용 같은 것을 가지고 있는 거겠지.`},
+ {s:"미나토", t:`그렇다는 건, 범인의 복장 특징은…….`},
+ {q:[
+   {label:`작업복`},
+   {label:`미끄럼 방지 신발`},
+   {label:`마스크`},
+   {label:`두꺼운 옷`, ok:true},
+   {label:`정장`},
+ ]},
+ {s:"미나토", t:`특징은 두꺼운 옷이에요. 이능을 가진 사람도 보통 사람처럼 뜨거움이나 차가움을 느끼겠죠. 방한 대책을 하고 있던 게 틀림없어요. 하지만 극도로 추위를 많이 타는 사람도 있을 거예요. 그러니까, 범인을 특정할 만한 확실한 증거는 없습니다. 무작정 체포할 수도 없고요……`},
+ {s:"유키미즈", t:`안 된다고 단정하지 마! 음. 폭파 테러를 미연에 방지하려면, 우리가 범인을 찾아내야 해. 어딘가에 미세한 증거는 없을까. 실마리가 될 만한, 아주 미세한 증거는…….`},
+ {s:"미나토", t:`어? 혹시……. 저야 모르겠지만, 토오루 씨라면 알 수도 있을 것 같습니다……!`},
+ {s:"유키미즈", t:`그렇다는 건가? 아니, 혹시…… 그때의 기억이 힌트가…….`},
+ {q:[
+   {label:`유키미즈의 과거`},
+   {label:`오늘 낮의 사고`, ok:true},
+   {label:`미나토와의 순찰`},
+ ]},
+ {s:"유키미즈", t:`우리가 만났을 때의 낮의 사고. 원인은 [나가부츠]가 있는 복합건물 옥상 급수탱크의 노후화와 어젯밤의 냉기였다. 정말 그럴까? 사실 생각해 보면 추위가 심했던 건 우리 빌딩 주변도 마찬가지야. 어젯밤의 추위를 알고 있을 것 같은 츠키시로 카구야는 낮인데도 추위가 남아 있는 듯한 발언을 했지. 낮의 사고와 이번 사건, [추위]라는 공통점이 있어. 그 두 가지를 연결 지으면 범인이 이능을 이용하여 급수탱크의 파이프를 동결시켰을 가능성이 있어.`},
+ {s:"미나토", t:`그랬군요! 명추리십니다, 토오루 씨!`},
+ {s:"유키미즈", t:`이건 추리 같은 게 아니야. 그냥 감일 뿐이야. 하지만, 지금은 그걸로 됐어. 시간은 시시각각 다가오고 있어. 빨리 범인과 장소를 특정하자!`},
+ {s:"미나토", t:`지금까지의 정보들로 미루어 볼 때 수상한 장소, 범인이 있을 만한 곳은…….`},
+ {q:[
+   {label:`관람차`},
+   {label:`분수`},
+   {label:`과학관 [아스노]`},
+   {label:`서쪽 광장`, ok:true},
+   {label:`롤러코스터`},
+   {label:`제1설비동`, ok:true},
+   {label:`제2설비동`},
+   {label:`휴게실`},
+ ]},
+ {s:"미나토", t:`청취 조사에서 알아낸 위험한 장소는 두 군데, [제1설비동]과 [서쪽 광장]입니다. [제1설비동]의 보일러 파이프가 [서쪽 광장]의 분출 파이프로 연결되어 있어, 어느 한쪽이든 얼어버리면 위험한 것 같습니다. 그래서 그곳에 있던 인물이 수상합니다. 방한 대책이 철저한 두꺼운 옷을 입은 사람을 세 명. 그중 [패딩을 입은 손님]은 서부 에리어로 이동 중이며 [서쪽 광장]으로 갈 가능성이 있습니다. 다른 [두꺼운 코트를 입은 손님]은 [제1설비동]으로 이동했을 가능성이 있습니다. 그리고 마지막 [털장갑과 모자를 쓴 손님]은 과학관으로 가는 모습이었는데, 과학관은 곧 문을 닫는다고 누군가에게 들은 것 같습니다. 그 후에는 어디로 가는지 모르겠어요. 그러니까 세 명 모두 범행 가능성이 있습니다.`},
+ {s:"유키미즈", t:`하지만 나라면 [감정동조]에서 읽어낸 감정에서 범인을 찾을 수 있을지도 몰라. 이능을 가진 범인이 안고 있는 감정은……`},
+ {q:[
+   {label:`선망`},
+   {label:`외로움`, ok:true},
+   {label:`낙관`},
+   {label:`불만`},
+   {label:`짜증`},
+   {label:`관심`},
+   {label:`불안`},
+   {label:`호기심`},
+   {label:`기대`},
+ ]},
+ {s:"유키미즈", t:`나도 과거에 느꼈던 고독으로 인한 [외로움]. 청취 조사에서 확실히 그때의 감정을 느꼈다. 이능에 몸부림치는 범인은 두꺼운 롱패딩의 여성 손님. 그녀의 목적지는 서부 지역 중 동결로 사건을 일으킬 수 있는 곳, 즉 서쪽 광장이다.`},
+ {s:"미나토", t:`적어도, 가장 가능성이 높은 거 같아요. 달려요!`},
+ {s:"유키미즈", t:`좋아, 달리자!`},
+];
+
+/* ============================================================
+   엔진
+   ============================================================ */
+const SPK={ "미나토":{c:"var(--mina)",side:"L"}, "유키미즈":{c:"var(--yuki)",side:"R"} };
+function spk(n){ return SPK[n]||{c:"#b8c0cc",side:"L"}; }
+
+const log=document.getElementById('log');
+const stage=document.getElementById('stage');
+const hint=document.getElementById('hint');
+const quiz=document.getElementById('quiz');
+const doneEl=document.getElementById('done');
+let i=0, done=false, quizActive=false;
+
+function el(t,a){ const e=document.createElement(t); for(const k in a) e.setAttribute(k,a[k]); return e; }
+function dlg(name,text){
+  const s=spk(name);
+  const row=el('div',{class:'row '+s.side});
+  const b=el('div',{class:'bubble'}); b.style.borderColor=s.c;
+  const nm=el('div',{class:'name'}); nm.style.color=s.c; nm.textContent=name;
+  const tx=el('div',{class:'txt'}); tx.textContent=text;
+  b.appendChild(nm); b.appendChild(tx); row.appendChild(b);
+  log.appendChild(row); log.scrollTop=log.scrollHeight;
+}
+
+function advance(){
+  if(done||quizActive) return;
+  if(i>=STORY.length){ finish(); return; }
+  const step=STORY[i];
+  if(step.q){ showQuiz(step.q); return; }   // 정답 맞힐 때까지 i 고정
+  dlg(step.s, step.t); i++;
+  if(i<STORY.length && STORY[i] && STORY[i].q) showQuiz(STORY[i].q);
+}
+function showQuiz(opts){
+  quizActive=true; hint.style.display='none';
+  quiz.innerHTML='';
+  opts.forEach(o=>{
+    const btn=el('button',{class:'qbtn'}); btn.textContent=o.label;
+    btn.addEventListener('click',ev=>{ ev.stopPropagation(); pickQuiz(o,btn); });
+    quiz.appendChild(btn);
+  });
+  quiz.style.display='flex'; log.scrollTop=log.scrollHeight;
+}
+function pickQuiz(o,btn){
+  if(btn.classList.contains('x')) return;
+  if(o.sub){ showQuiz(o.sub); return; }          // 하위 선택지로
+  if(o.ok){                                       // 정답 → 진행
+    quizActive=false; quiz.style.display='none'; quiz.innerHTML='';
+    hint.style.display=''; i++; advance();
+    return;
+  }
+  btn.classList.add('x'); btn.disabled=true;      // 오답 → ✗
+}
+function finish(){
+  done=true; hint.style.display='none';
+  doneEl.innerHTML='';
+  const t=el('div',{}); t.textContent='― 추리 종료 ―'; doneEl.appendChild(t);
+  const b=el('button',{}); b.textContent='다음으로 →';
+  b.addEventListener('click',ev=>{ ev.stopPropagation(); window.location.href='https://anjaeheung.github.io/park-finale/'; });
+  doneEl.appendChild(b);
+  doneEl.style.display='flex'; doneEl.scrollIntoView({behavior:'smooth'});
+}
+
+stage.addEventListener('click',e=>{ if(e.target.closest('button')) return; advance(); });
+advance();
+</script>
+</body>
+</html>
