@@ -205,7 +205,8 @@ function showQuiz(opts){
 }
 function pickQuiz(o,btn){
   if(btn.classList.contains('x')) return;
-  if(o.sub){ showQuiz(o.sub); return; }          // 하위 선택지로
+  if(o.sub){ showQuiz(o.sub); return; }          // 하위 선택지로 (확인 없이 이동)
+  if(!confirm('「'+o.label+'」\n\n이 답으로 결정하시겠어요?')) return;  // 답 선택 전 확인
   if(o.ok){                                       // 정답 → 진행
     quizActive=false; quiz.style.display='none'; quiz.innerHTML='';
     hint.style.display=''; i++; advance();
